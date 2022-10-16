@@ -20,7 +20,7 @@ spring cloud를 이용하여 MSA를 개발해보자
 
 1. [Spring Cloud Netflix Eureka](#spring-cloud-netflix-eureka)
 2. [Spring Cloud Netflix Eureka 셋팅](#spring-cloud-netflix-eureka-셋팅)
-3.
+3. [Eureka client 예제 프로젝트 생성](#eureka-client-예제-프로젝트-생성)
 
 
 
@@ -456,6 +456,24 @@ eureka:
 http://localhost:8761를 띄워보면 Eureka Dashboard를 볼 수 있다.
 
 ![Eureka-dashboard](./img/Eureka-dashboard.PNG)
+
+<br>
+
+<!--------------------- 3.  Eureka client 예제 프로젝트 생성
+---------------------------------------->
+
+# Eureka client 예제 프로젝트 생성
+
+클라이언트가 서비스 요청시에 그 서비스가 어디에 등록되어있는지 알 수 있도록 해주는 Service Discovery인 Eureka서버를 만들어 보았다.
+
+
+
+
+
+
+
+
+
 
 
 
