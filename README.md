@@ -19,8 +19,8 @@ spring cloud를 이용하여 MSA를 개발해보자
 🟣 Service Discovery
 
 1. [Spring Cloud Netflix Eureka](#spring-cloud-netflix-eureka)
-2. [Spring Cloud Netflix Eureka 셋팅](#spring-cloud-netflix-eureka-셋팅)
-3. [Eureka client 예제 프로젝트 생성](#eureka-client-예제-프로젝트-생성)
+2. [Spring Cloud Netflix Eureka 서버 셋팅](#spring-cloud-netflix-eureka-서버-셋팅)
+3. [Spring Cloud Netflix Eureka client 프로젝트 생성](#spring-cloud-netflix-eureka-client-예제-프로젝트-생성)
 
 
 
@@ -326,7 +326,7 @@ Client - Load Balancer(API Gateway) - ServiceDiscovery(Eureka) - Services....
 <!--------------------- 2. Spring Cloud Netflix Eureka 셋팅
 ---------------------------------------->
 
-# Spring Cloud Netflix Eureka 셋팅
+# Spring Cloud Netflix Eureka 서버 셋팅
 
 IntelliJ 버전 : 2022.2.3  
 JDK 버전 : jdk-11.0.15  
@@ -338,7 +338,7 @@ Dependencies에 Spring Cloud Discovery - Eureka Server 추가
 서비스 디스커버리 역할만을 하기 위한 Eureka 서버이기 때문에 다른 Dependency는 추가하지 않는다.   
 
 
-🔹 프로젝트 생성시 pom.xml은 자동으로 생성된다 ! dependency가 잘 들어갔나 확인해보자.  
+### 🔹 **프로젝트 생성시 pom.xml은 자동으로 생성된다 ! dependency가 잘 들어갔나 확인해보자.**  
 
 > maven 프로젝트 경우에는 pom.xml 생성된다.  
 > gradle 프로젝트 경우에는 build 생성된다.  
@@ -348,62 +348,63 @@ Dependencies에 Spring Cloud Discovery - Eureka Server 추가
 ``` xml
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-	<modelVersion>4.0.0</modelVersion>
-	<parent>
-		<groupId>org.springframework.boot</groupId>
-		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>2.7.4</version>
-		<relativePath/> <!-- lookup parent from repository -->
-	</parent>
-	<groupId>com.example</groupId>
-	<artifactId>discoveryservice</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
-	<name>discoveryservice</name>
-	<description>discoveryservice</description>
-	<properties>
-		<java.version>11</java.version>
-		<spring-cloud.version>2021.0.4</spring-cloud.version>
-	</properties>
-	<dependencies>
-		<dependency>
-			<groupId>org.springframework.cloud</groupId>
-			<artifactId>spring-cloud-starter-netflix-eureka-server</artifactId>
-		</dependency>
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>2.7.4</version>
+        <relativePath/> <!-- lookup parent from repository -->
+    </parent>
+    <groupId>com.example</groupId>
+    <artifactId>discovery-service</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>discovery-service</name>
+    <description>discovery-service</description>
+    <properties>
+        <java.version>11</java.version>
+        <spring-cloud.version>2021.0.4</spring-cloud.version>
+    </properties>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-eureka-server</artifactId>
+        </dependency>
 
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-test</artifactId>
-			<scope>test</scope>
-		</dependency>
-	</dependencies>
-	<dependencyManagement>
-		<dependencies>
-			<dependency>
-				<groupId>org.springframework.cloud</groupId>
-				<artifactId>spring-cloud-dependencies</artifactId>
-				<version>${spring-cloud.version}</version>
-				<type>pom</type>
-				<scope>import</scope>
-			</dependency>
-		</dependencies>
-	</dependencyManagement>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
-	<build>
-		<plugins>
-			<plugin>
-				<groupId>org.springframework.boot</groupId>
-				<artifactId>spring-boot-maven-plugin</artifactId>
-			</plugin>
-		</plugins>
-	</build>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
 
 </project>
+
 
 ```
 
 
-🔹 Eureka 서버라고 지정해 주자 !
+### 🔹 **Eureka 서버라고 지정해 주자 !**
 
 > 메인클래스에 @EnableEurekaServer 어노테이션을 추가하여 프로젝트가 Eureka 서버라고 지정해준다.  
 
@@ -414,18 +415,22 @@ package com.example.discoveryservice;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.netflix.eureka.server.EnableEurekaServer;
 
 @SpringBootApplication
-public class DiscoveryserviceApplication {
+@EnableEurekaServer
+public class DiscoveryServiceApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(DiscoveryserviceApplication.class, args);
-	}
+    public static void main(String[] args) {
+        SpringApplication.run(DiscoveryServiceApplication.class, args);
+    }
 
 }
 
+
 ```
-🔹 Application.yml 파일에 유레카 서버정보를 셋팅하자!
+
+### 🔹 **Application.yml 파일에 유레카 서버정보를 셋팅하자!**
 
 스프링부트 프로젝트 초기에 application.properties파일을 yml파일로 바꾸어주자.  
 properties를 그냥 써도 되긴 함.  
@@ -435,7 +440,7 @@ properties를 그냥 써도 되긴 함.
 1. 서버 포트번호 설정 : 유레카는 웹 서비스 성격으로 구동되기 때문에 포트를 설정
 2. application-name 설정 : 마이크로 서비스의 고유 아이디 부여
 3. eureka client 설정 : 현재 우리가 만드는건 서버인데 왜 유레카 클라이언트 설정을 해야하는가?  
-유레카 라이브러리가 포함된채 스프링부트가 기동이 되면 자동으로 서비스 정보가 등록이 된다.(default가 true임)
+유레카 라이브러리가 포함된 채 스프링부트가 기동이 되면 자동으로 서비스 정보가 등록이 된다.(default가 true임)
 하지만 지금은 서버 설정하는 부분이기 때문에 false로 설정하여 자기자신(서버)의 정보는 등록되지 않도록 해준다.
 걍 서버로서 기동만 되면 된다.
 
@@ -462,21 +467,121 @@ http://localhost:8761를 띄워보면 Eureka Dashboard를 볼 수 있다.
 <!--------------------- 3.  Eureka client 예제 프로젝트 생성
 ---------------------------------------->
 
-# Eureka client 예제 프로젝트 생성
+# Spring Cloud Netflix Eureka client 예제 프로젝트 생성
 
-클라이언트가 서비스 요청시에 그 서비스가 어디에 등록되어있는지 알 수 있도록 해주는 Service Discovery인 Eureka서버를 만들어 보았다.
+클라이언트가 서비스 요청시에 어디에 서비스가 등록되어있는지 알 수 있는 Service Discovery(Eureka)서버를 만들어 보았다.  
+이제는 Discovery 서버에 등록 될 API 서버(클라이언트 서버)를 간단히 만들어보자!  
+
+### USER-SERVICE API 생성 (Client)
+
+IntelliJ 버전 : 2022.2.3  
+JDK 버전 : jdk-11.0.15  
+Spring Boot 버전 : 2.7.4  
+
+IntelliJ를 이용하여 Create New Project - Spring Initializr를 통하여 Boot Project 생성  
+
+**추가 할 Dependencies**
+- Eureka Discovery Client
+- Spring Boot DevTools
+- Lombok
+- Spring Web
+
+### 🔹 **USER-SERVICE 프로젝트를 Eureka 클라이언트 서버로 지정해 주자 !**  
+
+> 메인클래스에 @EnableDiscoveryClient 어노테이션을 추가하여 프로젝트 Eureka 클라이언트 서버로 지정해준다.  
+
+**[UserServiceApplication.java]**
+
+``` java
+package com.example.userservice;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
+import org.springframework.cloud.netflix.eureka.EnableEurekaClient;
+
+@SpringBootApplication
+@EnableDiscoveryClient
+public class UserServiceApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(UserServiceApplication.class, args);
+    }
+
+}
+
+```
+
+### 🔹 **Application.yml 파일에 유레카 클라이언트 정보를 셋팅하자!**  
+
+스프링부트 프로젝트 초기에 application.properties파일을 yml파일로 바꾸어주자.  
+properties를 그냥 써도 되긴 함.  
+
+**[application.yml]**
+
+1. 서버 포트번호 설정 : 9001로 지정 (임의로 지정함)
+2. application-name 설정 : 마이크로 서비스의 고유 아이디 부여
+3. eureka client 설정 : true로 설정하면 eureka 서버로부터 인스턴스들의 정보를 주기적으로 가져온다. 갱신 된 정보를 받겠다는 것이다.  
+
+``` yml
+server:
+  port: 9001
+  
+spring:
+  application:
+    name: user-service
+    
+eureka:
+  client:
+    register-with-eureka: true
+    fetch-registry: true
+    service-url:
+      defaultZone: http://127.0.0.1:8761/eureka
+
+```
+
+> 성공적으로 USER-SERVICE가 등록이 되었다면 유레카 서버에 9001 서비스가 하나 올라온 것을 볼 수 있다.
+
+![image](https://user-images.githubusercontent.com/115538649/196148858-a013004d-902b-42c2-9551-efe27978cad2.png)
 
 
+> 아래와 같은 에러가 발생했다면 유레카 서버를 켰는지 확인해보자.  
+> 유레카 서버의 포트번호를 8761로 설정했는지 확인해보자.  
+
+```Request execution error. endpoint=DefaultEndpoint{ serviceUrl='http://localhost:8761/eureka/}, exception=I/O error on GET request for "http://localhost:8761/eureka/apps/": Connect to localhost:8761 [localhost/127.0.0.1, localhost/0:0:0:0:0:0:0:1] failed: Connection refused: connect....```
 
 
+### 🔹 **서비스를 더 추가해보자 !**  
+
+✅ 서비스를 추가 하는 방법 1  
+
+기존에 만든 userServiceApplication을 복제해서 서비스를 하나 더 만든다.  
+기존에 user-service 포트와 겹치지 않도록 포트번호 9002로 설정해주고 userServiceApplication2를 실행해준다.  
+
+![image](https://user-images.githubusercontent.com/115538649/196157830-f633f119-532a-4dcc-ab2c-72014659d92d.png)
+
+> USER-SERVICE가 2개가 올라간 것을 볼 수 있다. UP {2} - 9001, 9002
+
+![image](https://user-images.githubusercontent.com/115538649/196156463-4f6a35a5-b6bb-47f0-8046-fe0e0d3df919.png)
 
 
+✅ 서비스를 추가 하는 방법 2  
+
+인텔리제이 terminal에서 mvn 명령어를 이용하여 서비스를 하나 더 추가한다.
+``` 
+mvn spring-boot:run -Dspring-boot.run.jvmArguments='-Dserver.port=9003'
+```
 
 
+✅ 서비스를 추가 하는 방법 3  
 
+user-service 폴더의 위치로 이동하여 명령어를 실행한다.  
+target에 jar파일이 생성시킨 뒤 jar파일을 실행해준다.  
 
-
-
-
-
+``` 
+> cd [작업경로]/user-service
+> mvn clean
+> mvn compile package
+> java -jar -Dserver.port=9004 ./target/user-service-0.0.1-SNAPSHOT.jar
+```
 
