@@ -474,7 +474,7 @@ http://localhost:8761를 띄워보면 Eureka Dashboard를 볼 수 있다.
 클라이언트가 서비스 요청시에 어디에 서비스가 등록되어있는지 알 수 있는 Service Discovery(Eureka)서버를 만들어 보았다.  
 이제는 Discovery 서버에 등록 될 API 서버(클라이언트 서버)를 간단히 만들어보자!  
 아래 방법은 서비스마다 PORT번호를 부여해주는 방식이다.  
-[랜덤으로 포트를 지정하는 방법도 있다.](#eureka-client-랜덤포트-설정)
+랜덤으로 포트를 지정하는 방법도 있다.
 
 ### USER-SERVICE API 생성 (Client)
 
