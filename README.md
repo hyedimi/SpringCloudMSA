@@ -328,6 +328,8 @@ Client - Load Balancer(API Gateway) - ServiceDiscovery(Eureka) - Services....
 
 # Spring Cloud Netflix Eureka 서버 셋팅
 
+서비스 디스커버리 역할을 하는 Eureka 서버를 셋팅하고 실행해보자.
+
 IntelliJ 버전 : 2022.2.3  
 JDK 버전 : jdk-11.0.15  
 Spring Boot 버전 : 2.7.4  
@@ -471,6 +473,8 @@ http://localhost:8761를 띄워보면 Eureka Dashboard를 볼 수 있다.
 
 클라이언트가 서비스 요청시에 어디에 서비스가 등록되어있는지 알 수 있는 Service Discovery(Eureka)서버를 만들어 보았다.  
 이제는 Discovery 서버에 등록 될 API 서버(클라이언트 서버)를 간단히 만들어보자!  
+아래 방법은 서비스마다 PORT번호를 부여해주는 방식이다.  
+[랜덤으로 포트를 지정하는 방법도 있다.](#eureka-client-랜덤포트-설정)
 
 ### USER-SERVICE API 생성 (Client)
 
@@ -585,3 +589,29 @@ target에 jar파일이 생성시킨 뒤 jar파일을 실행해준다.
 > java -jar -Dserver.port=9004 ./target/user-service-0.0.1-SNAPSHOT.jar
 ```
 
+### 🔹 Eureka Client 랜덤포트 설정
+
+**[application.yml]**
+
+server-port를 0으로 설정하면 랜덤으로 포트번호가 할당된다.  
+port를 0으로 지정하면 유레카 서버에 인스턴스가 1개밖에 보이지 않기 때문에 추가정보를 적어줘야한다.
+
+```yml
+
+server:
+  port: 0
+
+spring:
+  application:
+    name: user-service
+
+eureka:
+  instance:
+    instance-id: ${spring.cloud.client.hostname}:${spring.application.instance_id:${random.value}}
+  client:
+    register-with-eureka: true
+    fetch-registry: true
+    service-url:
+      defaultZone: http://127.0.0.1:8761/eureka
+
+```
