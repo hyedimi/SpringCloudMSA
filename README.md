@@ -22,6 +22,11 @@ spring cloud를 이용하여 MSA를 개발해보자
 2. [Spring Cloud Netflix Eureka 서버 셋팅](#spring-cloud-netflix-eureka-서버-셋팅)
 3. [Spring Cloud Netflix Eureka client 프로젝트 생성](#spring-cloud-netflix-eureka-client-예제-프로젝트-생성)
 
+🟣 API Gateway Service
+
+1. [API Gateway Service 특징](#api-gateway-service-특징)
+2. [Netflix Ribbon과 Zuul](#netflix-ribbon과-zuul)
+3. [Spring Cloud Gateway](#spring-cloud-gateway)
 
 
 <!--
@@ -36,7 +41,7 @@ spring cloud를 이용하여 MSA를 개발해보자
 #
 <br>
 
-<!-------------- 1. MSA란 무엇일까 (Monolith vs MSA) --------------------------------->
+<!-------------- 1-1. MSA란 무엇일까 (Monolith vs MSA) --------------------------------->
 
 # 🟣 MSA와 Spring Cloud의 개념
 # Monolith vs MSA
@@ -67,7 +72,7 @@ MSA(Microservice Architecture)는 [클라우드 네이티브 아키텍쳐](#clou
 <br>
 
 
-<!--------------------- 2. Cloud Native Architecture 의 이해 ---------------------------------------->
+<!--------------------- 1-2. Cloud Native Architecture 의 이해 ---------------------------------------->
 
 # Cloud Native Architecture 의 이해
 
@@ -91,7 +96,7 @@ MSA(Microservice Architecture)는 [클라우드 네이티브 아키텍쳐](#clou
   
 <br>
 
-<!--------------------- 3. Cloud Native Application 의 이해 ---------------------------------------->
+<!--------------------- 1-3. Cloud Native Application 의 이해 ---------------------------------------->
 
 # Cloud Native Application 의 이해
 
@@ -137,7 +142,7 @@ MSA(Microservice Architecture)는 [클라우드 네이티브 아키텍쳐](#clou
 
 <br>
 
-<!--------------------- 4. SOA와 MSA차이 ---------------------------------------->
+<!--------------------- 1-4. SOA와 MSA차이 ---------------------------------------->
 
 # SOA와 MSA차이
 
@@ -159,7 +164,7 @@ MSA(Microservice Architecture)는 [클라우드 네이티브 아키텍쳐](#clou
 
 <br>
 
-<!--------------------- 5. RESTful Web Service ---------------------------------------->
+<!--------------------- 1-5. RESTful Web Service ---------------------------------------->
 
 # RESTful Web Service
 
@@ -170,7 +175,7 @@ MSA(Microservice Architecture)는 [클라우드 네이티브 아키텍쳐](#clou
 
 <br>
 
-<!--------------------- 6.  MSA 표준 구성요소---------------------------------------->
+<!--------------------- 1-6.  MSA 표준 구성요소---------------------------------------->
 
 # MSA 표준 구성요소
 
@@ -207,7 +212,7 @@ MSA(Microservice Architecture)는 [클라우드 네이티브 아키텍쳐](#clou
 
 <br>
 
-<!--------------------- 7. MSA 기반 기술---------------------------------------->
+<!--------------------- 1-7. MSA 기반 기술---------------------------------------->
 # MSA 기반 기술
 
 🔸 **Gateway**  
@@ -236,7 +241,7 @@ elastic, DATADOG
 
 <br>
 
-<!--------------------- 8. Spring Cloud---------------------------------------->
+<!--------------------- 1-8. Spring Cloud---------------------------------------->
 
 # Spring Cloud란 무엇일까
 
@@ -250,7 +255,7 @@ elastic, DATADOG
 
 <br>
 
-<!--------------------- 9. Spring Cloud 구성요소---------------------------------------->
+<!--------------------- 1-9. Spring Cloud 구성요소---------------------------------------->
 
 # Spring Cloud 구성요소
 
@@ -277,7 +282,7 @@ elastic, DATADOG
 
 
 <br>
-<!--------------------- 10. 실습에 사용 할 Spring Cloud Project---------------------------------------->
+<!--------------------- 1-10. 실습에 사용 할 Spring Cloud Project---------------------------------------->
 
 # 실습에 사용할 Spring Cloud Project
 
@@ -292,7 +297,7 @@ elastic, DATADOG
 #
 # 🟣 Service Discovery
 
-<!--------------------- 1. Spring Cloud Netflix Eureka
+<!--------------------- 2-1. Spring Cloud Netflix Eureka
 ---------------------------------------->
 
 # Spring Cloud Netflix Eureka
@@ -323,7 +328,7 @@ Client - Load Balancer(API Gateway) - ServiceDiscovery(Eureka) - Services....
 <br>
 
 
-<!--------------------- 2. Spring Cloud Netflix Eureka 셋팅
+<!--------------------- 2-2. Spring Cloud Netflix Eureka 셋팅
 ---------------------------------------->
 
 # Spring Cloud Netflix Eureka 서버 셋팅
@@ -466,7 +471,7 @@ http://localhost:8761를 띄워보면 Eureka Dashboard를 볼 수 있다.
 
 <br>
 
-<!--------------------- 3.  Eureka client 예제 프로젝트 생성
+<!--------------------- 2-3.  Eureka client 예제 프로젝트 생성
 ---------------------------------------->
 
 # Spring Cloud Netflix Eureka client 예제 프로젝트 생성
@@ -615,3 +620,80 @@ eureka:
       defaultZone: http://127.0.0.1:8761/eureka
 
 ```
+
+<br>
+
+<!--------------------- 3-1.  API Gateway Service 특징
+---------------------------------------->
+
+# API Gateway Service 특징
+
+- API Gateway Service는 사용자가 설정한 라우팅 설정에 따라서 각각 엔드포인트로 클라이언트 대신해서 요청하고 응답을 받아서 클라이언트에 전달해주는 PROXY역할을 한다.
+- 시스템의 내부 구조는 숨기고 외부의 요청에 대해서 적절한 형태로 가공하여 응답함
+- 인증 및 권한 부여
+- MSA 검색 통합
+- 응답 캐싱
+- 회로차단기 (요청 문제 발생시 차단)
+- 속도 제한
+- 부하 분산
+- 로깅, 추적(진입점과 그 후 단계 추적가능)
+- 헤더정보, 쿼리 요청 정보 값 확인가능
+- IP 허용 관리
+
+<br>
+
+<!--------------------- 3-2.  Netflix Ribbon과 Zuul
+---------------------------------------->
+
+# Netflix Ribbon과 Zuul
+
+## Netflix Ribbon
+
+API Gateway Service를 구현하기전에 Netflix Ribbon과 Zuul에 대해서 알아보자.  
+MSA간 통신시에 사용하는 대표적인 두가지 방식이 있다.  
+
+✔ **RestTemplate**  
+  RestTemplate 인스턴스를 생성하여 접속하고자하는 URL, 포트, 파라미터를 통하여 외부서비스로 연동  
+  
+✔ **Feign Client**  
+  인터페이스를 하나 만들어서 @FeignClient("store") 처럼 이름을 등록하여, 직접적인 서버 주소 포트번호 필요없이 msa 이름으로 호출이 가능하다.
+
+로드발랜서를 어디에 구축해서 관리할것인가?  
+Netflix회사가 제공하는 로드발랜서 기술인 Ribbon이 있었다.  
+Spring Cloud Ribbon은 클라이언트측에 구축하여 관리하였다.  
+MSA 이름을 가지고 호출하는 방식이다.  
+Healtht Check를 해당하는 서비스가 정상적으로 작동중인지 확인이 가능하다.  
+Ribbon은 비동기 처리가 잘 되지 않으면서 사용을 안하게 되었다.  
+**Spring Cloud Ribbon은 Spring Boot 2.4에서 Maintenance 상태이다. 사용하지않음**  
+
+ ➡ Spring Cloud Loadbalancer를 사용하자!  
+ 
+## Netflix Zuul
+
+API gateway 역할과 라우팅 기능을 해주는 서비스이다.  
+- @EnableZullProxy 어노테이션을 통하여 Zull 서버 역할로 지정.  
+- ZuulFilter를 상속받아서 MSA 호출시 사전/사후 동작을 추가할 수 있다. (ex.로깅)  
+
+[zull 라우팅 설정]
+
+``` yml
+zuul:
+ routes:
+  first-service:
+   path: /first-service/**
+   url: http://localhost:8081
+  second-service:
+   path: /second-service/**
+   url: http://localhost:8082
+```
+
+**Spring Cloud Zuul 역시 Spring Boot 2.4에서 Maintenance 상태이다. 사용하지않음**  
+
+ ➡ Spring Cloud Gateway를 사용하자!  
+
+<br>
+
+<!--------------------- 3-3.  Spring Cloud Gateway
+---------------------------------------->
+
+# Spring Cloud Gateway
