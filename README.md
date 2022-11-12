@@ -27,6 +27,7 @@ spring cloud를 이용하여 MSA를 개발해보자
 1. [API Gateway Service 특징](#api-gateway-service-특징)
 2. [Netflix Ribbon과 Zuul](#netflix-ribbon과-zuul)
 3. [Spring Cloud Gateway](#spring-cloud-gateway)
+4. [Spring Cloud Gateway Filter)(spring-cloud-gateway-filter)
 
 
 <!--
@@ -282,7 +283,7 @@ elastic, DATADOG
 
 
 <br>
-<!--------------------- 1-10. 실습에 사용 할 Spring Cloud Project---------------------------------------->
+<!--------------------- 1-10. 실습에 사용 할 Spring Cloud Project----------------------------------->
 
 # 실습에 사용할 Spring Cloud Project
 
@@ -297,8 +298,7 @@ elastic, DATADOG
 #
 # 🟣 Service Discovery
 
-<!--------------------- 2-1. Spring Cloud Netflix Eureka
----------------------------------------->
+<!--------------------- 2-1. Spring Cloud Netflix Eureka----------------------------------->
 
 # Spring Cloud Netflix Eureka
 
@@ -328,8 +328,7 @@ Client - Load Balancer(API Gateway) - ServiceDiscovery(Eureka) - Services....
 <br>
 
 
-<!--------------------- 2-2. Spring Cloud Netflix Eureka 셋팅
----------------------------------------->
+<!--------------------- 2-2. Spring Cloud Netflix Eureka 셋팅------------------------------------>
 
 # Spring Cloud Netflix Eureka 서버 셋팅
 
@@ -554,6 +553,17 @@ eureka:
 ![image](https://user-images.githubusercontent.com/115538649/196148858-a013004d-902b-42c2-9551-efe27978cad2.png)
 
 
+> 서버 실행 후 Eureka에서 localhost가 아닌 DESKTOP-JED000I 이런식으로 본인 컴퓨터의 호스트이름이 노출되고있다.
+이럴때는 application.yml에 eureka.instance.instance-id 설정을 따로 해주면 된다.  
+
+```yml
+eureka:
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${spring.application.instance_id:${server.port}}
+```
+
+
 > 아래와 같은 에러가 발생했다면 유레카 서버를 켰는지 확인해보자.  
 > 유레카 서버의 포트번호를 8761로 설정했는지 확인해보자.  
 
@@ -623,8 +633,7 @@ eureka:
 
 <br>
 
-<!--------------------- 3-1.  API Gateway Service 특징
----------------------------------------->
+<!--------------------- 3-1.  API Gateway Service 특징------------------------------------->
 
 # API Gateway Service 특징
 
@@ -693,7 +702,179 @@ zuul:
 
 <br>
 
-<!--------------------- 3-3.  Spring Cloud Gateway
----------------------------------------->
+<!--------------------- 3-3.  Spring Cloud Gateway------------------------------------->
 
 # Spring Cloud Gateway
+
+**Spring Cloud Gateway** : 비동기 처리 가능  
+(Zuul 1.X는 동기방식 서비스였으며 2.X에서 비동기를 지원하지만 호환성 문제로 Gateway를 사용한다)   
+
+
+
+first-service와 second-service의 dependencies에 lombok, spring web, Eureka Discovery Client가 추가된다.
+
+## 😎 Spring Cloud Gateway서버를 만들어보자!
+
+### 🔹 step 1. Dependencies 설정
+
+DevTools  
+Eureka Discovery Client  
+Spring Cloud Routing - gateway  
+
+**[pom.xml]**
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>2.7.5</version>
+        <relativePath/> <!-- lookup parent from repository -->
+    </parent>
+    <groupId>com.example</groupId>
+    <artifactId>apigateway-service</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>apigateway-service</name>
+    <description>apigateway-service</description>
+    <properties>
+        <java.version>11</java.version>
+        <spring-cloud.version>2021.0.5</spring-cloud.version>
+    </properties>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-gateway</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
+```
+
+### 🔹 step 2. application.yml 설정
+
+어디로 포워딩 할지 설정해보자!  
+tomcat이 아닌 Netty 라는 비동기 서버가 작동 될 것이다.  
+
+gateway(port:8000) application 설정 :  
+클라이언트 요청시 path형태가 /first-service/** 일 경우, first-service(port:8081) 서버로 연결하도록 설정했다.
+
+**[application.yml]**
+```yml
+
+server:
+  port: 8000
+  address: localhost
+
+eureka:
+  #instance:
+    #prefer-ip-address: true
+    #instance-id: ${spring.application.name}:${spring.application.instance_id:${server.port}}
+  client:
+    register-with-eureka: false
+    fetch-registry: false
+    service-url:
+      defaultZone: http://localhost:8761/eureka
+
+spring:
+  application:
+    name: apigateway-service
+  cloud:
+    gateway:
+      routes:
+        - id: first-service
+          uri: http://localhost:8081/
+          predicates:
+            - Path=/first-service/**
+        - id: second-service
+          uri: http://localhost:8082/
+          predicates:
+            - Path=/second-service/**
+```
+
+> 참고로 server.address 미설정시에 자꾸 주소부분이 킹받게 호스트명으로 실행되서 address를 localhost로 지정해버렸다.  
+
+자꾸 http://desktop-jed000i:8000/first-service/welcome 이렇게 실행이 되고있었다.. 
+
+
+### 🔹 step 3. 성공 로그 확인
+
+Gateway(port:8000)에서 url에 맞게 서비스를 호출하는 로그를 확인할 수 있다.  
+http://localhost:8000/first-service/welcome ➡ http://localhost:8081/first-service/welcome  
+
+```log
+17:44:30.955 [DEBUG] [r.n.http.server.HttpServerOperations] - [dd7255ee, L:/127.0.0.1:8000 - R:/127.0.0.1:1602] Increasing pending responses, now 1
+17:44:30.955 [DEBUG] [reactor.netty.http.server.HttpServer] - [dd7255ee-8, L:/127.0.0.1:8000 - R:/127.0.0.1:1602] Handler is being applied: org.springframework.http.server.reactive.ReactorHttpHandlerAdapter@32a15f0e
+17:44:30.956 [DEBUG] [o.s.w.s.a.HttpWebHandlerAdapter] - [dd7255ee-8] HTTP GET "/first-service/welcome"
+17:44:30.956 [DEBUG] [o.s.c.g.h.RoutePredicateHandlerMapping] - Route matched: first-service
+17:44:30.956 [DEBUG] [o.s.c.g.h.RoutePredicateHandlerMapping] - Mapping [Exchange: GET http://localhost:8000/first-service/welcome] to Route{id='first-service', uri=http://localhost:8081/, order=0, predicate=Paths: [/first-service/**], match trailing slash: true, gatewayFilters=[], metadata={}}
+17:44:30.956 [DEBUG] [o.s.c.g.h.RoutePredicateHandlerMapping] - [dd7255ee-8] Mapped to org.springframework.cloud.gateway.handler.FilteringWebHandler@253741b6
+17:44:30.956 [DEBUG] [o.s.c.g.handler.FilteringWebHandler] - Sorted gatewayFilterFactories: [[GatewayFilterAdapter{delegate=org.springframework.cloud.gateway.filter.RemoveCachedBodyFilter@626d2016}, order = -2147483648], [GatewayFilterAdapter{delegate=org.springframework.cloud.gateway.filter.AdaptCachedBodyGlobalFilter@186d8a71}, order = -2147482648], [GatewayFilterAdapter{delegate=org.springframework.cloud.gateway.filter.NettyWriteResponseFilter@19489b27}, order = -1], [GatewayFilterAdapter{delegate=org.springframework.cloud.gateway.filter.ForwardPathFilter@125d47c4}, order = 0], [GatewayFilterAdapter{delegate=org.springframework.cloud.gateway.filter.RouteToRequestUrlFilter@2d5a1588}, order = 10000], [GatewayFilterAdapter{delegate=org.springframework.cloud.gateway.filter.ReactiveLoadBalancerClientFilter@13ed066e}, order = 10150], [GatewayFilterAdapter{delegate=org.springframework.cloud.gateway.filter.LoadBalancerServiceInstanceCookieFilter@4d705112}, order = 10151], [GatewayFilterAdapter{delegate=org.springframework.cloud.gateway.filter.WebsocketRoutingFilter@193bb809}, order = 2147483646], [GatewayFilterAdapter{delegate=org.springframework.cloud.gateway.filter.NettyRoutingFilter@590765c4}, order = 2147483647], [GatewayFilterAdapter{delegate=org.springframework.cloud.gateway.filter.ForwardRoutingFilter@4f116ca2}, order = 2147483647]]
+17:44:30.959 [DEBUG] [r.n.r.PooledConnectionProvider] - [7f4d64d9] Created a new pooled channel, now: 0 active connections, 0 inactive connections and 0 pending acquire requests.
+17:44:30.959 [DEBUG] [r.netty.transport.TransportConfig] - [7f4d64d9] Initialized pipeline DefaultChannelPipeline{(reactor.left.httpCodec = io.netty.handler.codec.http.HttpClientCodec), (reactor.right.reactiveBridge = reactor.netty.channel.ChannelOperationsHandler)}
+17:44:30.960 [DEBUG] [r.netty.transport.TransportConnector] - [7f4d64d9] Connecting to [localhost/127.0.0.1:8081].
+17:44:30.961 [DEBUG] [r.n.r.DefaultPooledConnectionProvider] - [7f4d64d9, L:/127.0.0.1:1814 - R:localhost/127.0.0.1:8081] Registering pool release on close event for channel
+17:44:30.961 [DEBUG] [r.n.r.PooledConnectionProvider] - [7f4d64d9, L:/127.0.0.1:1814 - R:localhost/127.0.0.1:8081] Channel connected, now: 1 active connections, 0 inactive connections and 0 pending acquire requests.
+17:44:30.961 [DEBUG] [r.n.r.DefaultPooledConnectionProvider] - [7f4d64d9, L:/127.0.0.1:1814 - R:localhost/127.0.0.1:8081] onStateChange(PooledConnection{channel=[id: 0x7f4d64d9, L:/127.0.0.1:1814 - R:localhost/127.0.0.1:8081]}, [connected])
+17:44:30.961 [DEBUG] [r.n.r.DefaultPooledConnectionProvider] - [7f4d64d9-1, L:/127.0.0.1:1814 - R:localhost/127.0.0.1:8081] onStateChange(GET{uri=null, connection=PooledConnection{channel=[id: 0x7f4d64d9, L:/127.0.0.1:1814 - R:localhost/127.0.0.1:8081]}}, [configured])
+17:44:30.961 [DEBUG] [r.n.http.client.HttpClientConnect] - [7f4d64d9-1, L:/127.0.0.1:1814 - R:localhost/127.0.0.1:8081] Handler is being applied: {uri=http://localhost:8081/first-service/welcome, method=GET}
+17:44:30.961 [DEBUG] [r.n.r.DefaultPooledConnectionProvider] - [7f4d64d9-1, L:/127.0.0.1:1814 - R:localhost/127.0.0.1:8081] onStateChange(GET{uri=/first-service/welcome, connection=PooledConnection{channel=[id: 0x7f4d64d9, L:/127.0.0.1:1814 - R:localhost/127.0.0.1:8081]}}, [request_prepared])
+17:44:30.961 [DEBUG] [reactor.netty.channel.FluxReceive] - [dd7255ee-8, L:/127.0.0.1:8000 - R:/127.0.0.1:1602] FluxReceive{pending=0, cancelled=false, inboundDone=true, inboundError=null}: subscribing inbound receiver
+17:44:30.962 [DEBUG] [r.n.r.DefaultPooledConnectionProvider] - [7f4d64d9-1, L:/127.0.0.1:1814 - R:localhost/127.0.0.1:8081] onStateChange(GET{uri=/first-service/welcome, connection=PooledConnection{channel=[id: 0x7f4d64d9, L:/127.0.0.1:1814 - R:localhost/127.0.0.1:8081]}}, [request_sent])
+17:44:30.967 [DEBUG] [r.n.http.client.HttpClientOperations] - [7f4d64d9-1, L:/127.0.0.1:1814 - R:localhost/127.0.0.1:8081] Received response (auto-read:false) : RESPONSE(decodeResult: success, version: HTTP/1.1)
+
+```
+
+<br>
+<!--------------------- 3-4.  Spring Cloud Gateway Filter-------------------------------------->
+## Spring Cloud Gateway Filter
+
+## 😎 Spring Cloud Gateway Filter를 등록해보자!
+
+방법은 두가지다 ! JAVA CODE로 등록하는 방법과 YML에서 등록하는 방법이 있다!
+
+
