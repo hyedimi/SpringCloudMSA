@@ -27,7 +27,7 @@ spring cloud를 이용하여 MSA를 개발해보자
 1. [API Gateway Service 특징](#api-gateway-service-특징)
 2. [Netflix Ribbon과 Zuul](#netflix-ribbon과-zuul)
 3. [Spring Cloud Gateway](#spring-cloud-gateway)
-4. [Spring Cloud Gateway Filter](spring-cloud-gateway-filter)
+4. [Spring Cloud Gateway Filter](#spring-cloud-gateway-filter)
 
 
 <!--
@@ -871,9 +871,10 @@ http://localhost:8000/first-service/welcome ➡ http://localhost:8081/first-serv
 
 <br>
 <!--------------------- 3-4.  Spring Cloud Gateway Filter-------------------------------------->
+
 ## Spring Cloud Gateway Filter
 
-## 😎 Spring Cloud Gateway Filter를 등록해보자!
+### 😎 Spring Cloud Gateway Filter를 등록해보자!
 
 방법은 두가지다 ! JAVA CODE로 등록하는 방법과 YML에서 등록하는 방법이 있다!
 
