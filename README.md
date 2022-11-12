@@ -27,7 +27,7 @@ spring cloud를 이용하여 MSA를 개발해보자
 1. [API Gateway Service 특징](#api-gateway-service-특징)
 2. [Netflix Ribbon과 Zuul](#netflix-ribbon과-zuul)
 3. [Spring Cloud Gateway](#spring-cloud-gateway)
-4. [Spring Cloud Gateway Filter)(spring-cloud-gateway-filter)
+4. [Spring Cloud Gateway Filter](spring-cloud-gateway-filter)
 
 
 <!--
