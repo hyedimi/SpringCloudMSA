@@ -28,6 +28,7 @@ spring cloud를 이용하여 MSA를 개발해보자
 2. [Netflix Ribbon과 Zuul](#netflix-ribbon과-zuul)
 3. [Spring Cloud Gateway](#spring-cloud-gateway)
 4. [Spring Cloud Gateway Filter](#spring-cloud-gateway-filter)
+5. [Spring Cloud Gateway Custom Filter](#spring-cloud-gateway-custom-filter)
 
 
 <!--
@@ -878,4 +879,182 @@ http://localhost:8000/first-service/welcome ➡ http://localhost:8081/first-serv
 
 방법은 두가지다 ! JAVA CODE로 등록하는 방법과 YML에서 등록하는 방법이 있다!
 
+### 🔹 JAVA CODE로 Filter 적용하기
+
+api gateway 서버에 config 패키지를 하나 추가해주고 FilterConfig 파일을 하나 만들어 주었다.  
+두개의 msa 서비스(first-service/second-service)를 라우터로 등록해보자!
+
+1. 라우터를 생성 (.route())
+2. path를 지정하여 (r.path()) Client에서 해당 path형태의 요청이 오면
+3. request와 response에 헤더값을 추가해준다. (.addResponseHeader("",""))
+4. 실제 각 msa 서비스 uri로 이동시켜준다. (.uri(""))
+5. 각 msa 서비스에서는 requestHeader에 적용시킨 헤더값을 받아볼 수 있고, 서비스가 끝난 후 Client에게 gateway를 통하여 responseHeader값도 전달해줄 수 있다.  
+
+**[FilterConfig.java]**
+```java
+package com.example.apigatewayservice.config;
+
+import org.springframework.cloud.gateway.route.RouteLocator;
+import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class FilterConfig {
+
+    @Bean
+    public RouteLocator gatewayRoutes(RouteLocatorBuilder builder){
+
+        return builder.routes()
+                .route(r -> r.path("/first-service/**")
+                        .filters(f -> f.addRequestHeader("first-request","first-request-header")
+                                .addResponseHeader("first-response","first-response-header"))
+                        .uri("http://localhost:8081"))
+                .route(r -> r.path("/second-service/**")
+                        .filters(f -> f.addRequestHeader("second-request","second-request-header")
+                                .addResponseHeader("second-response","second-response-header"))
+                        .uri("http://localhost:8082"))
+                .build();
+    }
+}
+```
+
+### 🔹 YML 파일로 Filter 적용하기
+
+**[application.yml]**
+```yml
+spring:
+  application:
+    name: apigateway-service
+  cloud:
+    gateway:
+      routes:
+        - id: first-service
+          uri: http://localhost:8081/
+          predicates:
+            - Path=/first-service/**
+          filters:
+            - AddRequestHeader=first-request, first-request-header
+            - AddResponseHeader=first-response, first-response-header
+        - id: second-service
+          uri: http://localhost:8082/
+          predicates:
+            - Path=/second-service/**
+          filters:
+            - AddRequestHeader=second-request, second-request-header
+            - AddResponseHeader=second-response, second-response-header
+
+```
+> second-service를 호출했을 때, response에 second-response-header라고 값이 잘 나오는걸 확인할 수 있다.
+
+![image](https://user-images.githubusercontent.com/115538649/201505834-d88f0dc3-9d0e-4738-a7e6-9e66a4f3f61a.png)
+
+☑ 각 msa 서비스에서 헤더값을 아래와 같이 받아볼 수 있다.
+```java
+package com.example.firstservice;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@Slf4j
+@RestController
+@RequestMapping("/first-service")
+public class FirstServiceController {
+
+    @GetMapping("/message")
+    public String message(@RequestHeader("first-request") String header){
+        // 헤더값을 받아온다.
+        log.info(header);
+        return "message in First Service.";
+    }
+}
+
+```
+
+<br>
+<!--------------------- 3-5.  Spring Cloud Gateway Custom Filter-------------------------------------->
+
+## Spring Cloud Gateway Custom Filter
+
+Filter를 통하여 로그를 추가, 인증 처리, locale 변경 등 자유롭게 등록할 수 있는 방법!  
+CustomFilter는 반드시 AbstractGatewayFilterFactory를 상속받아서 등록해야한다.  
+예제에서는 상속시에 해당 클래스의 내부클래스를 매개변수를 등록하였다.  
+
+> gateway는 비동기 방식의 내장서버인 netty를 사용하기 때문에 ServerHttpRequest/ServerHttpResponse객체를 이용한다.  
+(tomcat에서는 servletRequest/servletResponse)
+
+
+filter 패키지를 하나 생성해서 CustomFilter.java 파일을 생성해주었다.
+
+**[CustomFilter.java]**
+```java
+package com.example.apigatewayservice.filter;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.cloud.gateway.filter.GatewayFilter;
+import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
+
+import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.http.server.reactive.ServerHttpResponse;
+import org.springframework.stereotype.Component;
+import reactor.core.publisher.Mono;
+
+@Component
+@Slf4j
+public class CustomFilter extends AbstractGatewayFilterFactory<CustomFilter.Config> {
+
+    public CustomFilter(){
+        super(Config.class);
+    }
+
+    @Override
+    public GatewayFilter apply(Config config) {
+
+        // Custom Pre Filter
+        return (exchange, chain) -> {
+            ServerHttpRequest request = exchange.getRequest();
+            ServerHttpResponse response = exchange.getResponse();
+
+            log.info("Custom PRE filter : request id -? {}", request.getId());
+
+            // Custom Post Filter
+            return chain.filter(exchange).then(Mono.fromRunnable(() -> {
+                log.info("Custom POST filter : response code -? {}", response.getStatusCode());
+            }));
+        };
+    }
+
+    public static class Config{
+        // put the configuration properties
+    }
+}
+```
+
+**[application.yml]**
+```yml
+spring:
+  application:
+    name: apigateway-service
+  cloud:
+    gateway:
+      routes:
+        - id: first-service
+          uri: http://localhost:8081/
+          predicates:
+            - Path=/first-service/**
+          filters:
+            - CustomFilter
+        - id: second-service
+          uri: http://localhost:8082/
+          predicates:
+            - Path=/second-service/**
+          filters:
+            - CustomFilter
+```
+
+
+![image](https://user-images.githubusercontent.com/115538649/201506666-61d3bc2f-21bd-47fe-aa68-47df276ceedd.png)
 
