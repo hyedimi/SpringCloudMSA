@@ -29,7 +29,9 @@ spring cloud를 이용하여 MSA를 개발해보자
 3. [Spring Cloud Gateway](#spring-cloud-gateway)
 4. [Spring Cloud Gateway Filter](#spring-cloud-gateway-filter)
 5. [Spring Cloud Gateway Custom Filter](#spring-cloud-gateway-custom-filter)
-
+6. [Spring Cloud Gateway Global Filter](#spring-cloud-gateway-global-filter)
+7. [Spring Cloud Gateway Logging Filter](#spring-cloud-gateway-logging-filter)
+8. [Gateway Load Balancer](#gateway-load-balancer)
 
 <!--
 - 마이크로 서비스 특징
@@ -592,7 +594,6 @@ eureka:
 mvn spring-boot:run -Dspring-boot.run.jvmArguments='-Dserver.port=9003'
 ```
 
-
 ✅ 서비스를 추가 하는 방법 3  
 
 user-service 폴더의 위치로 이동하여 명령어를 실행한다.  
@@ -605,12 +606,19 @@ target에 jar파일이 생성시킨 뒤 jar파일을 실행해준다.
 > java -jar -Dserver.port=9004 ./target/user-service-0.0.1-SNAPSHOT.jar
 ```
 
+위 방법이 안되면 -Dserver.port 대신 --server.port로 실행
+
+
 ### 🔹 Eureka Client 랜덤포트 설정
 
 **[application.yml]**
 
 server-port를 0으로 설정하면 랜덤으로 포트번호가 할당된다.  
 port를 0으로 지정하면 서비스를 여러개 올리더라도 유레카 서버에 인스턴스가 1개밖에 보이지 않기 때문에 추가정보(instance-id)를 적어줘야한다.
+
+적어준뒤
+
+> mvn spring-boot:run
 
 ```yml
 
@@ -710,9 +718,15 @@ zuul:
 **Spring Cloud Gateway** : 비동기 처리 가능  
 (Zuul 1.X는 동기방식 서비스였으며 2.X에서 비동기를 지원하지만 호환성 문제로 Gateway를 사용한다)   
 
+### (●'◡'●) Spring Cloud Gateway 예제의 최종목표!
+- client에서 gateway에 'first-service'라는 서비스를 호출해본다.  
+- gateway는 eureka server([서비스 디스커버리](#spring-cloud-netflix-eureka))에서 'first-service'가 등록된 서비스 정보를 찾아서 gateway에게 알려준다.  
+- 그 정보를 가지고 gateway는 실제 'first-service'에 해당하는 서비스를 호출한다.  
+- 추가로 gateway기능중 [필터기능](#spring-cloud-gateway-filter)도 함께 진행해보자! prefilter(서비스 호출 전 작업)와 postfilter(서비스 호출 후 작업)를 적용시켜본다.  
 
+![image](https://user-images.githubusercontent.com/115538649/201515946-6efc82bc-93f9-463a-b3e2-21a21ad88600.png)
 
-first-service와 second-service의 dependencies에 lombok, spring web, Eureka Discovery Client가 추가된다.
+* first-service와 second-service의 dependencies에 lombok, spring web, Eureka Discovery Client가 추가된다.
 
 ## 😎 Spring Cloud Gateway서버를 만들어보자!
 
@@ -1014,6 +1028,10 @@ public class CustomFilter extends AbstractGatewayFilterFactory<CustomFilter.Conf
     public GatewayFilter apply(Config config) {
 
         // Custom Pre Filter
+        // apply 함수 리턴값은 gatewayFilter이며
+        // GatewayFilter 인터페이스에 선언된 filter 메소드는 아래와같이 선언되어있다.
+        // Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain);
+        
         return (exchange, chain) -> {
             ServerHttpRequest request = exchange.getRequest();
             ServerHttpResponse response = exchange.getResponse();
@@ -1032,6 +1050,8 @@ public class CustomFilter extends AbstractGatewayFilterFactory<CustomFilter.Conf
     }
 }
 ```
+
+설정파일에 라우팅 정보마다 필터에 CustomFilter를 추가해주자.  
 
 **[application.yml]**
 ```yml
@@ -1057,4 +1077,377 @@ spring:
 
 
 ![image](https://user-images.githubusercontent.com/115538649/201506666-61d3bc2f-21bd-47fe-aa68-47df276ceedd.png)
+
+
+<br>
+<!--------------------- 3-6.  Spring Cloud Gateway Global Filter-------------------------------------->
+
+## Spring Cloud Gateway Global Filter
+
+라우팅 정보마다 필터를 지정하지 않고 설정파일(application.yml)에서 default-filters를 이용하여 설정가능하다.  
+상속시 Global Filter에 Config라는 이너클래스를 매개변수로 전달해준다.  
+Config 안에는 자유롭게 변수를 정의하고 (preLogger, postLogger, baseMessage) 설정파일(application.yml)에서 제어가가능하다.  
+  
+
+**[Application.yml]**
+```yml
+spring:
+  application:
+    name: apigateway-service
+  cloud:
+    gateway:
+      default-filters:
+        - name: GlobalFilter
+          args:
+            baseMessage: Spring Cloud Gateway Global Filter
+            preLogger: true
+            postLogger: true
+      routes:
+        - id: first-service
+          uri: http://localhost:8081/
+          predicates:
+            - Path=/first-service/**
+          filters:
+            - CustomFilter
+        - id: second-service
+          uri: http://localhost:8082/
+          predicates:
+            - Path=/second-service/**
+          filters:
+            - CustomFilter
+
+```
+
+**[GlobalFilter.java]**
+```java
+
+package com.example.apigatewayservice.filter;
+
+import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.cloud.gateway.filter.GatewayFilter;
+import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
+import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.http.server.reactive.ServerHttpResponse;
+import org.springframework.stereotype.Component;
+import reactor.core.publisher.Mono;
+
+@Component
+@Slf4j
+public class GlobalFilter extends AbstractGatewayFilterFactory<GlobalFilter.Config> {
+
+    public GlobalFilter(){
+        super(Config.class);
+    }
+
+    @Override
+    public GatewayFilter apply(Config config) {
+
+        return (exchange, chain) -> {
+            ServerHttpRequest request = exchange.getRequest();
+            ServerHttpResponse response = exchange.getResponse();
+
+            log.info("Global Filter baseMessage : {}", config.getBaseMessage());
+
+            if(config.isPreLogger()){
+                log.info("Global Filter Start : request id -> {}", request.getId());
+            }
+            
+            return chain.filter(exchange).then(Mono.fromRunnable(() -> {
+                if(config.isPostLogger()){
+                    log.info("Global Filter End : response code -? {}", response.getStatusCode());
+                }
+            }));
+        };
+    }
+
+    @Data
+    public static class Config{
+        // put the configuration properties
+        private String baseMessage;
+        private boolean preLogger;
+        private boolean postLogger;
+    }
+}
+
+```
+
+로그를 통해 필터의 순서 확인해보자!  
+필터순서 : Global Filter Start -> Custom PRE Filter -> Custom POST Filter -> Global Filter End
+```log
+ [INFO ] [c.e.a.filter.GlobalFilter] - Global Filter baseMessage : Spring Cloud Gateway Global Filter
+ [INFO ] [c.e.a.filter.GlobalFilter] - Global Filter Start : request id -> 31b34dcc-3
+ [INFO ] [c.e.a.filter.CustomFilter] - Custom PRE filter : request id -? 31b34dcc-3
+ [INFO ] [c.e.a.filter.CustomFilter] - Custom POST filter : response code -? 200 OK
+ [INFO ] [c.e.a.filter.GlobalFilter] - Global Filter End : response code -? 200 OK
+```
+
+
+
+
+<br>
+<!--------------------- 3-7.  Spring Cloud Gateway Logging Filter-------------------------------------->
+
+## Spring Cloud Gateway Logging Filter
+
+라우팅마다 설정이 가능하다.  
+Second-service에만 logging Filter를 적용시켜보았다.  
+
+**[application.yml]**
+```yml
+spring:
+  application:
+    name: apigateway-service
+  cloud:
+    gateway:
+      default-filters:
+        - name: GlobalFilter
+          args:
+            baseMessage: Spring Cloud Gateway Global Filter
+            preLogger: true
+            postLogger: true
+      routes:
+        - id: first-service
+          uri: http://localhost:8081/
+          predicates:
+            - Path=/first-service/**
+          filters:
+            - CustomFilter
+        - id: second-service
+          uri: http://localhost:8082/
+          predicates:
+            - Path=/second-service/**
+          filters:
+            - name: CustomFilter
+            - name: LoggingFilter
+              args:
+                baseMessage: Hi
+                preLogger: true
+                postLogger: true
+```
+
+**[LoggingFilter.java]**
+```java
+package com.example.apigatewayservice.filter;
+
+import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.cloud.gateway.filter.GatewayFilter;
+import org.springframework.cloud.gateway.filter.OrderedGatewayFilter;
+import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
+import org.springframework.core.Ordered;
+import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.http.server.reactive.ServerHttpResponse;
+import org.springframework.stereotype.Component;
+import reactor.core.publisher.Mono;
+
+@Component
+@Slf4j
+public class LoggingFilter extends AbstractGatewayFilterFactory<LoggingFilter.Config> {
+
+    public LoggingFilter(){
+        super(Config.class);
+    }
+
+    @Override
+    public GatewayFilter apply(Config config) {
+        return (exchange, chain) -> {
+            ServerHttpRequest request = exchange.getRequest();
+            ServerHttpResponse response = exchange.getResponse();
+
+            log.info("Logging Filter baseMessage : {}", config.getBaseMessage());
+
+            if(config.isPreLogger()){
+                log.info("Logging Filter Start : request id -> {}", request.getId());
+            }
+
+            return chain.filter(exchange).then(Mono.fromRunnable(() -> {
+                if(config.isPostLogger()){
+                    log.info("Logging Filter End : response code -? {}", response.getStatusCode());
+                }
+            }));
+        };
+    }
+
+    @Data
+    public static class Config{
+        // put the configuration properties
+        private String baseMessage;
+        private boolean preLogger;
+        private boolean postLogger;
+    }
+}
+```
+
+```log
+17:56:38.272 [INFO ] [c.e.a.filter.GlobalFilter] - Global Filter baseMessage : Spring Cloud Gateway Global Filter
+17:56:38.272 [INFO ] [c.e.a.filter.GlobalFilter] - Global Filter Start : request id -> ff90595d-1
+17:56:38.272 [INFO ] [c.e.a.filter.CustomFilter] - Custom PRE filter : request id -? ff90595d-1
+17:56:38.272 [INFO ] [c.e.a.filter.LoggingFilter] - Logging Filter baseMessage : Hi
+17:56:38.272 [INFO ] [c.e.a.filter.LoggingFilter] - Logging Filter Start : request id -> ff90595d-1
+17:56:38.908 [INFO ] [c.e.a.filter.LoggingFilter] - Logging Filter End : response code -? 200 OK
+17:56:38.909 [INFO ] [c.e.a.filter.CustomFilter] - Custom POST filter : response code -? 200 OK
+17:56:38.909 [INFO ] [c.e.a.filter.GlobalFilter] - Global Filter End : response code -? 200 OK
+```
+
+
+<br>
+<!--------------------- 3-8.  Gateway Load Balancer------------------->
+
+## Gateway Load Balancer
+
+### 😎 최종적으로 유레카 서버에 서비스를 등록하는 작업을 해보자!
+
+
+* 로드밸런싱이 잘 되는지 보기위해 first-service, second-service 각 서비스의 인스턴스를 여러개 실행시켜놓았다.
+
+![image](https://user-images.githubusercontent.com/115538649/201517407-9e757832-6b10-486d-bcb8-56bb7799d179.png)
+
+
+**[gateway의 application.yml]**
+
+> 설정파일(application.yml) 작성시 유레카 서버(네이밍 서비스)에 등록되어있는 이름으로 uri를 설정해준다.  
+uri에 주소(http://localhost:.../) 작성이 아닌 -> lb://[SERVICE명] 이런 방식으로 변경해준다.  
+
+```yml
+server:
+  port: 8000
+  address: localhost
+
+eureka:
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${spring.application.instance_id:${server.port}}
+  client:
+    register-with-eureka: true
+    fetch-registry: true
+    service-url:
+      defaultZone: http://localhost:8761/eureka
+
+spring:
+  application:
+    name: apigateway-service
+  cloud:
+    gateway:
+      default-filters:
+        - name: GlobalFilter
+          args:
+            baseMessage: Spring Cloud Gateway Global Filter
+            preLogger: true
+            postLogger: true
+      routes:
+        - id: first-service
+          uri: lb://MY-FIRST-SERVICE
+          predicates:
+            - Path=/first-service/**
+          filters:
+            - CustomFilter
+        - id: second-service
+          uri: lb://MY-SECOND-SERVICE
+          predicates:
+            - Path=/second-service/**
+          filters:
+            - name: CustomFilter
+            - name: LoggingFilter
+              args:
+                baseMessage: Hi
+                preLogger: true
+                postLogger: true
+```
+
+
+**[first-service의 application.yml]**
+
+port를 0으로 지정해서 random으로 포트를 생성하도록 설정했다.
+
+> mvn spring-boot:run
+
+```yml
+server:
+  port: 0
+
+spring:
+  application:
+    name: my-first-service
+
+eureka:
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${spring.application.instance_id:${random.value}}
+  client:
+    register-with-eureka: true
+    fetch-registry: true
+    service-url:
+      defaultZone: http://localhost:8761/eureka
+```
+
+**[second-service의 application.yml]**
+
+```yml
+server:
+  port: 8082
+
+spring:
+  application:
+    name: my-second-service
+
+eureka:
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${spring.application.instance_id:${server.port}}
+  client:
+    register-with-eureka: true
+    fetch-registry: true
+    service-url:
+      defaultZone: http://localhost:8761/eureka
+```
+
+**[first-service의 FirstServiceController.java]**
+
+/check호출시에 어떤 port로 호출이 되는지 확인해보자!
+현재 first-service는 여러개의 인스턴스를 켜놓은 상태이다.
+
+```java
+
+package com.example.firstservice;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import javax.servlet.http.HttpServletRequest;
+
+@Slf4j
+@RestController
+@RequestMapping("/first-service")
+public class FirstServiceController {
+
+    Environment env;
+
+    @Autowired
+    public FirstServiceController(Environment env){
+        this.env = env;
+    }
+
+    @GetMapping("/check")
+    public String check(HttpServletRequest request){
+        log.info("server port = {}", request.getServerPort());
+        return String.format("hi, first service on PORT %s", env.getProperty("local.server.port"));
+    }
+}
+
+```
+
+### ✔ 로드발랜서 기능이 잘 되고있는 것을 확인할 수 있다!
+
+gateway가 라운드 로빈 방식으로 여러개의 인스턴스중에 하나를 호출해주는 것을 확인해보았다!!
+
+![image](https://user-images.githubusercontent.com/115538649/201517488-1c2496f1-6f8e-46c3-8b5a-fe4f05076e4a.png)
+
+![image](https://user-images.githubusercontent.com/115538649/201517499-a7eaaa36-b83e-4d81-bdb5-0f323ffa0bd5.png)
+
 
